@@ -5124,7 +5124,7 @@ function renderProjLedger(){
   const budgetPct = budget>0?Math.min(110,Math.round(txExp/budget*100)):0;
   const bar_c = budgetPct>=100?'#dc2626':budgetPct>=80?'#f59e0b':'#163655';
 
-  // ── اکونت‌های اختصاصی — محاسبه قبل از summary ──
+  // ── اکونت‌های اختصاصی (چارت اکونت) — محاسبه قبل از summary ──
   const projAccounts = DB.accounts.filter(a=>a.projectId&&String(a.projectId)===String(projId));
   const _accData = projAccounts.map(a=>{
     const txs = DB.transactions.filter(t=>t.projectId===projId&&t.accountId===a.id);
@@ -5135,9 +5135,25 @@ function renderProjLedger(){
   const totalAccInc = _accData.reduce((s,x)=>s+x.inc,0);
   const totalAccExp = _accData.reduce((s,x)=>s+x.exp,0);
   const totalAccBal = totalAccInc - totalAccExp;
-  // مبلغ خالص دریافتی = عواید اکونت‌های اختصاصی؛ باقی‌مانده = دریافتی − مصارف
-  const netIncome = totalAccInc;
-  const balance   = totalAccBal;
+
+  // ── اکونت نقدی اختصاصی پروژه — موجودی واقعی (کل دریافتی − کل مصارف) ──
+  const dedicatedCa = p.cashAccountId ? (DB.cashAccounts||[]).find(c=>c.id===p.cashAccountId) : null;
+  let caReceived = 0, caSpent = 0, caBalance = 0, caName = '';
+  if(dedicatedCa){
+    const caOpening = dedicatedCa.openingBalance||0;
+    const caTxInc   = DB.transactions.filter(t=>t.cashAccountId===dedicatedCa.id&&t.type==='income').reduce((s,t)=>s+t.amount,0);
+    const caTxExp   = DB.transactions.filter(t=>t.cashAccountId===dedicatedCa.id&&t.type==='expense').reduce((s,t)=>s+t.amount,0);
+    const caDonInc  = DB.donations.filter(d=>d.cashAccountId===dedicatedCa.id).reduce((s,d)=>s+d.amount,0);
+    const caSpInc   = (DB.sponsorPayments||[]).filter(sp=>sp.cashAccountId===dedicatedCa.id).reduce((s,sp)=>s+sp.amount,0);
+    caReceived = caOpening + caTxInc + caDonInc + caSpInc;
+    caSpent    = caTxExp;
+    caBalance  = caReceived - caSpent;
+    caName     = dedicatedCa.name||'';
+  }
+  // مبلغ خالص دریافتی از اکونت اختصاصی؛ فال‌بک به چارت اکونت اگر اکونت نقدی اختصاصی نداشت
+  const netIncome = dedicatedCa ? caReceived : totalAccInc;
+  const netSpent  = dedicatedCa ? caSpent    : txExp;
+  const balance   = dedicatedCa ? caBalance  : totalAccBal;
 
   // کارت‌های اکونت برای summary
   const _accCards = _accData.map(({a,inc,exp,bal})=>{
@@ -5154,29 +5170,42 @@ function renderProjLedger(){
     </div>`;
   }).join('');
 
-  // Summary — اکونت اختصاصی + بودجه کل + مصرف‌شده + باقی‌مانده
+  // Summary — اکونت نقدی اختصاصی (دریافتی / مصارف / باقی‌مانده) + چارت اکونت
   document.getElementById('proj-ledger-summary').innerHTML = `
+    ${dedicatedCa ? `
+    <div style="background:#f0fdf4;border:2px solid #86efac;border-radius:12px;padding:13px 16px;margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <span style="font-size:12px;font-weight:800;color:#166534">🔒 اکونت اختصاصی پروژه: ${caName}</span>
+        <span style="font-size:10px;color:#15803d;background:#dcfce7;border-radius:5px;padding:2px 8px;font-weight:600">موجودی فعلی: ${AFN(caBalance)}</span>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+        <div style="text-align:center;background:#fff;border-radius:10px;padding:10px 6px;border:1.5px solid #86efac;box-shadow:0 1px 4px rgba(22,101,52,.07)">
+          <div style="font-size:10px;color:#15803d;font-weight:700;margin-bottom:4px">💰 مبلغ خالص دریافتی</div>
+          <div style="font-size:18px;font-weight:900;color:#166534">${AFN(netIncome)}</div>
+          <div style="font-size:9px;color:#64748b;margin-top:3px">کل واریز به اکونت</div>
+          ${netIncome===0?'<div style="font-size:9px;color:#f59e0b;margin-top:2px;font-weight:700">⚠️ واریزی ثبت نشده</div>':''}
+        </div>
+        <div style="text-align:center;background:#fff5f5;border-radius:10px;padding:10px 6px;border:1.5px solid #fca5a5;box-shadow:0 1px 4px rgba(220,38,38,.07)">
+          <div style="font-size:10px;color:#dc2626;font-weight:700;margin-bottom:4px">📊 مصرف‌شده</div>
+          <div style="font-size:18px;font-weight:900;color:#dc2626">${AFN(netSpent)}</div>
+          <div style="font-size:9px;color:#64748b;margin-top:3px">کل مصارف از اکونت</div>
+        </div>
+        <div style="text-align:center;background:${balance>=0?'#f0fdf4':'#fff5f5'};border-radius:10px;padding:10px 6px;border:2px solid ${balance>=0?'#4ade80':'#fca5a5'};box-shadow:0 1px 4px rgba(0,0,0,.07)">
+          <div style="font-size:10px;color:${balance>=0?'#166534':'#dc2626'};font-weight:700;margin-bottom:4px">${balance>=0?'✅':'⚠️'} باقی‌مانده</div>
+          <div style="font-size:18px;font-weight:900;color:${balance>=0?'#166534':'#dc2626'}">${AFN(balance)}</div>
+          <div style="font-size:9px;color:#64748b;margin-top:3px">دریافتی − مصارف</div>
+        </div>
+      </div>
+    </div>` : `
+    <div style="background:#fefce8;border:1.5px solid #fde68a;border-radius:10px;padding:10px 14px;margin-bottom:8px;font-size:12px;color:#92400e">
+      ⚠️ اکونت نقدی اختصاصی برای این پروژه تعریف نشده. برای نمایش دقیق دریافتی/مصارف/باقی‌مانده، یک اکونت اختصاصی در تنظیمات پروژه انتخاب کنید.
+    </div>`}
     <div style="background:#eff6ff;border:1.5px solid #93c5fd;border-radius:10px;padding:11px 14px;margin-bottom:6px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:${projAccounts.length>0?'8':'0'}px">
-        <span style="font-size:11px;font-weight:700;color:#1e40af">📁 اکونت‌های اختصاصی پروژه${projAccounts.length>0?' ('+projAccounts.length+' حساب)':''}</span>
+        <span style="font-size:11px;font-weight:700;color:#1e40af">📁 اکونت‌های اختصاصی (چارت اکونت)${projAccounts.length>0?' — '+projAccounts.length+' حساب':''}</span>
         ${projAccounts.length===0?'<span style="font-size:11px;color:#64748b;font-style:italic">حساب اختصاصی تعریف نشده</span>':''}
       </div>
-      ${projAccounts.length>0?`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px;margin-bottom:9px">${_accCards}</div>`:''}
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;${projAccounts.length>0?'border-top:1px solid #bfdbfe;padding-top:9px':''}">
-        <div style="text-align:center;background:#fff;border-radius:8px;padding:7px 4px;border:1px solid #bfdbfe">
-          <div style="font-size:10px;color:#1e40af;font-weight:700;margin-bottom:2px">✅ مبلغ خالص دریافتی</div>
-          <div style="font-size:16px;font-weight:800;color:#1e40af">${AFN(netIncome)}</div>
-          ${netIncome===0?'<div style="font-size:9px;color:#f59e0b;margin-top:1px">⚠️ عواید ثبت نشده</div>':''}
-        </div>
-        <div style="text-align:center;background:#fff5f5;border-radius:8px;padding:7px 4px;border:1px solid #fca5a5">
-          <div style="font-size:10px;color:#dc2626;font-weight:700;margin-bottom:2px">📊 مصرف‌شده</div>
-          <div style="font-size:16px;font-weight:800;color:#dc2626">${AFN(txExp)}</div>
-        </div>
-        <div style="text-align:center;background:${balance>=0?'#f0fdf4':'#fff5f5'};border-radius:8px;padding:7px 4px;border:1.5px solid ${balance>=0?'#86efac':'#fca5a5'}">
-          <div style="font-size:10px;color:${balance>=0?'#166534':'#dc2626'};font-weight:700;margin-bottom:2px">💵 باقی‌مانده</div>
-          <div style="font-size:16px;font-weight:800;color:${balance>=0?'#166534':'#dc2626'}">${AFN(balance)}</div>
-        </div>
-      </div>
+      ${projAccounts.length>0?`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px">${_accCards}</div>`:''}
     </div>
     ${budget>0?`<div class="stat-card" style="padding:8px 14px;display:flex;justify-content:space-between;align-items:center">
       <span style="font-size:11px;color:var(--text3)">📋 سقف بودجه پروژه</span>
@@ -6988,7 +7017,7 @@ openIDB()
 <div class="modal-bg" id="modal-proj-ledger">
   <div class="modal" style="max-width:900px">
     <h3 id="proj-ledger-title">📒 دفتر کل پروژه</h3>
-    <div id="proj-ledger-summary" style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:14px"></div>
+    <div id="proj-ledger-summary" style="display:block;margin-bottom:14px"></div>
     <!-- Budget progress -->
     <div id="proj-ledger-budget-bar" style="margin-bottom:14px"></div>
     <!-- Account breakdown -->
