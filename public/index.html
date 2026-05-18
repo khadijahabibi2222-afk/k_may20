@@ -5809,9 +5809,10 @@ function getProjectAccountIds(){
   return new Set((DB.projects||[]).filter(p=>p.cashAccountId).map(p=>p.cashAccountId));
 }
 
-function populateCashAccountSelect(selId, addEmpty, filter, forProjectId){
+function populateCashAccountSelect(selId, addEmpty, filter, forProjectId, includeAll){
   // filter: undefined=all, 'primary'=فقط اصلی, 'secondary'=فقط فرعی
   // forProjectId: if provided, show only that project's dedicated account (or general if no dedicated)
+  // includeAll: if true, show ALL cash accounts including project-dedicated ones (for transfer modal)
   ensureCashAccounts();
   const sel=document.getElementById(selId);if(!sel)return;
   const v=sel.value;
@@ -5821,12 +5822,13 @@ function populateCashAccountSelect(selId, addEmpty, filter, forProjectId){
   if(forProjectId){
     const proj=DB.projects.find(p=>p.id===forProjectId);
     if(proj&&proj.cashAccountId){
-      // Only show this project's dedicated account
       accounts=DB.cashAccounts.filter(ca=>ca.id===proj.cashAccountId);
     } else {
-      // No dedicated account — show general (non-dedicated) accounts
       accounts=DB.cashAccounts.filter(ca=>!projAccountIds.has(ca.id));
     }
+  } else if(includeAll){
+    // انتقال بین اکونت‌ها: همه اکونت‌ها شامل فرعی‌های پروژه نمایش داده شوند
+    accounts=DB.cashAccounts;
   } else {
     // General use: exclude all project-dedicated accounts
     accounts=DB.cashAccounts.filter(ca=>!projAccountIds.has(ca.id));
@@ -5835,7 +5837,8 @@ function populateCashAccountSelect(selId, addEmpty, filter, forProjectId){
     const bal=getCashAccountBalance(ca.id);
     const o=document.createElement('option');
     o.value=ca.id;
-    o.textContent=CA_ICONS[ca.type]+' '+ca.name+' — '+AFN(bal);
+    const projLabel=projAccountIds.has(ca.id)?includeAll?' 🔹':'':'';
+    o.textContent=CA_ICONS[ca.type]+' '+ca.name+projLabel+' — '+AFN(bal);
     sel.appendChild(o);
   });
   if(v)sel.value=v;
@@ -6530,8 +6533,8 @@ function openTransferModal(){
     alert('برای انتقال، باید حداقل ۲ اکونت نقدی تعریف شده باشد.');
     return;
   }
-  populateCashAccountSelect('tr-from',true);
-  populateCashAccountSelect('tr-to',true);
+  populateCashAccountSelect('tr-from',true,undefined,undefined,true);
+  populateCashAccountSelect('tr-to',true,undefined,undefined,true);
   document.getElementById('tr-amount').value='';
   document.getElementById('tr-date').value=today();
   document.getElementById('tr-note').value='';
@@ -6549,7 +6552,14 @@ function openTransferModal(){
 
 function showTransferBalances(){
   const fromId=parseInt(document.getElementById('tr-from').value)||0;
-  const toId=parseInt(document.getElementById('tr-to').value)||0;
+  // آپدیت لیست مقصد — اکونت مبدأ از لیست مقصد حذف شود
+  const toSel=document.getElementById('tr-to');
+  const prevToId=parseInt(toSel.value)||0;
+  populateCashAccountSelect('tr-to',true,undefined,undefined,true);
+  // حذف اکونت مبدأ از لیست مقصد
+  if(fromId){Array.from(toSel.options).forEach(o=>{if(parseInt(o.value)===fromId)o.remove();});}
+  if(prevToId&&prevToId!==fromId)toSel.value=prevToId;
+  const toId=parseInt(toSel.value)||0;
   const amt=parseFloat(document.getElementById('tr-amount').value)||0;
   const fromBal=fromId?getCashAccountBalance(fromId):null;
   const toBal=toId?getCashAccountBalance(toId):null;
