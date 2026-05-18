@@ -5400,6 +5400,9 @@ function renderProjLedger(){
 function printProjLedger(){
   var projId=_currentProjLedgerId; if(!projId)return;
   var p=DB.projects.find(function(x){return x.id===projId;}); if(!p)return;
+  // باز کردن پنجره چاپ — این خط حیاتی است
+  var w=window.open('','_blank','width=900,height=700');
+  if(!w){alert('مرورگر پنجره popup را بلاک کرده. لطفاً popup را برای این سایت اجازه دهید.');return;}
   var org=DB.settings.orgName||'موسسه خیریه';
   // لوگو — base64 که در DB ذخیره شده
   var logoHtml='';
@@ -5409,7 +5412,7 @@ function printProjLedger(){
     logoHtml='<div style="width:60px;height:60px;background:#1e3a5f;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:28px">📒</div>';
   }
   // ── محاسبات مالی برای چاپ ──
-  // اکونت‌های اختصاصی پروژه
+  // چارت اکونت‌های اختصاصی پروژه
   var pAccounts=DB.accounts.filter(function(a){return a.projectId&&String(a.projectId)===String(projId);});
   var pAccData=pAccounts.map(function(a){
     var txs=DB.transactions.filter(function(t){return t.projectId===projId&&t.accountId===a.id;});
@@ -5421,12 +5424,24 @@ function printProjLedger(){
   var pAccExp=pAccData.reduce(function(s,x){return s+x.exp;},0);
   var pAccBal=pAccInc-pAccExp;
 
-  // مبلغ خالص دریافتی = جمع عواید اکونت‌های اختصاصی
-  // مصارف = جمع مصارف اکونت‌های اختصاصی
-  // باقی‌مانده = خالص دریافتی − مصارف
+  // ── اکونت نقدی اختصاصی — دریافتی واقعی / مصارف / باقی‌مانده ──
   var txExp=DB.transactions.filter(function(t){return t.projectId===projId&&t.type==='expense';}).reduce(function(s,t){return s+t.amount;},0);
-  var netIncome=pAccInc;   // خالص دریافتی از اکونت اختصاصی
-  var balance=pAccBal;     // باقی‌مانده = دریافتی − مصارف اکونت‌ها
+  var dedicatedCaPrint=p.cashAccountId?(DB.cashAccounts||[]).find(function(c){return c.id===p.cashAccountId;}):null;
+  var caReceivedPrint=0,caSpentPrint=0,caBalancePrint=0,caNamePrint='';
+  if(dedicatedCaPrint){
+    var caOp=dedicatedCaPrint.openingBalance||0;
+    var caTxI=DB.transactions.filter(function(t){return t.cashAccountId===dedicatedCaPrint.id&&t.type==='income';}).reduce(function(s,t){return s+t.amount;},0);
+    var caTxE=DB.transactions.filter(function(t){return t.cashAccountId===dedicatedCaPrint.id&&t.type==='expense';}).reduce(function(s,t){return s+t.amount;},0);
+    var caDonI=DB.donations.filter(function(d){return d.cashAccountId===dedicatedCaPrint.id;}).reduce(function(s,d){return s+d.amount;},0);
+    var caSpI=(DB.sponsorPayments||[]).filter(function(sp){return sp.cashAccountId===dedicatedCaPrint.id;}).reduce(function(s,sp){return s+sp.amount;},0);
+    caReceivedPrint=caOp+caTxI+caDonI+caSpI;
+    caSpentPrint=caTxE;
+    caBalancePrint=caReceivedPrint-caSpentPrint;
+    caNamePrint=dedicatedCaPrint.name||'';
+  }
+  var netIncome=dedicatedCaPrint?caReceivedPrint:pAccInc;
+  var netSpentPrint=dedicatedCaPrint?caSpentPrint:txExp;
+  var balance=dedicatedCaPrint?caBalancePrint:pAccBal;
 
   // donations برای جدول ردیف‌ها
   var donations=DB.donations.filter(function(d){return d.projectId===projId;});
@@ -5506,18 +5521,25 @@ function printProjLedger(){
     +'</div>'
     // ── خلاصه مالی ──
     +'<div class="summary-box">'
-    // ردیف اکونت‌های اختصاصی
+    // اکونت نقدی اختصاصی — سطر اصلی
+    +(dedicatedCaPrint?
+      '<div style="background:#d1fae5;padding:10px 16px;border-bottom:2px solid #86efac">'
+      +'<div style="font-size:9.5pt;font-weight:bold;color:#065f46;margin-bottom:2px">🔒 اکونت نقدی اختصاصی پروژه: '+caNamePrint+'</div>'
+      +'<div style="font-size:8.5pt;color:#047857">موجودی فعلی اکونت: <strong>'+AFN(caBalancePrint)+'</strong></div>'
+      +'</div>'
+    :'')
+    // ردیف اکونت‌های چارت اکونت
     +(pAccounts.length>0
       ?'<div class="s-acc-row">'
-       +'<div style="font-size:9.5pt;font-weight:bold;color:#1e40af">📁 اکونت‌های اختصاصی پروژه ('+pAccounts.length+' حساب)</div>'
+       +'<div style="font-size:9.5pt;font-weight:bold;color:#1e40af">📁 اکونت‌های چارت ('+pAccounts.length+' حساب)</div>'
        +'<div class="s-acc-grid">'+pAccRows+'</div>'
        +'</div>'
       :'')
     // ردیف خالص دریافتی → مصارف → باقی‌مانده
     +'<div class="s-totals">'
-    +'<div class="s-cell blue-bg"><div class="s-label">✅ مبلغ خالص دریافتی (اکونت اختصاصی)</div><div class="s-val" style="color:#1e40af">'+AFN(netIncome)+'</div></div>'
-    +'<div class="s-cell red-bg"><div class="s-label">📊 مجموع مصارف</div><div class="s-val" style="color:#dc2626">'+AFN(pAccExp)+'</div></div>'
-    +'<div class="s-cell '+(balance>=0?'green-bg':'red-bg')+'"><div class="s-label">💵 باقی‌مانده</div><div class="s-val" style="color:'+(balance>=0?'#166534':'#dc2626')+'">'+AFN(balance)+'</div></div>'
+    +'<div class="s-cell blue-bg"><div class="s-label">💰 مبلغ خالص دریافتی'+(dedicatedCaPrint?' (اکونت اختصاصی)':'')+'</div><div class="s-val" style="color:#1e40af">'+AFN(netIncome)+'</div><div style="font-size:7.5pt;color:#64748b;margin-top:2px">کل واریز به اکونت</div></div>'
+    +'<div class="s-cell red-bg"><div class="s-label">📊 مجموع مصارف</div><div class="s-val" style="color:#dc2626">'+AFN(netSpentPrint)+'</div><div style="font-size:7.5pt;color:#64748b;margin-top:2px">کل مصارف پرداخت‌شده</div></div>'
+    +'<div class="s-cell '+(balance>=0?'green-bg':'red-bg')+'"><div class="s-label">'+(balance>=0?'✅':'⚠️')+' باقی‌مانده</div><div class="s-val" style="color:'+(balance>=0?'#166534':'#dc2626')+'">'+AFN(balance)+'</div><div style="font-size:7.5pt;color:#64748b;margin-top:2px">دریافتی − مصارف</div></div>'
     +(p.budget>0?'<div class="s-cell"><div class="s-label">📋 سقف بودجه</div><div class="s-val" style="color:#1e3a5f">'+AFN(p.budget)+'</div></div>':'')
     +'</div>'
     +'</div>'
