@@ -5120,8 +5120,6 @@ function renderProjLedger(){
   const txExp   = DB.transactions.filter(t=>t.projectId===projId&&t.type==='expense').reduce((s,t)=>s+t.amount,0);
   const allGross     = grossTotal + piGross;   // کل واریز قبل از کسر
   const allAdminFee  = adminFeeTotal + piFee;  // کل هزینه اداری
-  const netIncome    = netDons + txInc;        // کل عواید خالص
-  const balance      = netIncome - txExp;
   const budget = p.budget||0;
   const budgetPct = budget>0?Math.min(110,Math.round(txExp/budget*100)):0;
   const bar_c = budgetPct>=100?'#dc2626':budgetPct>=80?'#f59e0b':'#163655';
@@ -5137,6 +5135,9 @@ function renderProjLedger(){
   const totalAccInc = _accData.reduce((s,x)=>s+x.inc,0);
   const totalAccExp = _accData.reduce((s,x)=>s+x.exp,0);
   const totalAccBal = totalAccInc - totalAccExp;
+  // مبلغ خالص دریافتی = عواید اکونت‌های اختصاصی؛ باقی‌مانده = دریافتی − مصارف
+  const netIncome = totalAccInc;
+  const balance   = totalAccBal;
 
   // کارت‌های اکونت برای summary
   const _accCards = _accData.map(({a,inc,exp,bal})=>{
@@ -5378,43 +5379,72 @@ function printProjLedger(){
   } else {
     logoHtml='<div style="width:60px;height:60px;background:#1e3a5f;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:28px">📒</div>';
   }
-  // خلاصه مالی — مستقیم از DB محاسبه کن نه از DOM
+  // ── محاسبات مالی برای چاپ ──
+  // اکونت‌های اختصاصی پروژه
+  var pAccounts=DB.accounts.filter(function(a){return a.projectId&&String(a.projectId)===String(projId);});
+  var pAccData=pAccounts.map(function(a){
+    var txs=DB.transactions.filter(function(t){return t.projectId===projId&&t.accountId===a.id;});
+    var inc=txs.filter(function(t){return t.type==='income';}).reduce(function(s,t){return s+t.amount;},0);
+    var exp=txs.filter(function(t){return t.type==='expense';}).reduce(function(s,t){return s+t.amount;},0);
+    return {a:a,inc:inc,exp:exp,bal:inc-exp};
+  });
+  var pAccInc=pAccData.reduce(function(s,x){return s+x.inc;},0);
+  var pAccExp=pAccData.reduce(function(s,x){return s+x.exp;},0);
+  var pAccBal=pAccInc-pAccExp;
+
+  // مبلغ خالص دریافتی = جمع عواید اکونت‌های اختصاصی
+  // مصارف = جمع مصارف اکونت‌های اختصاصی
+  // باقی‌مانده = خالص دریافتی − مصارف
+  var txExp=DB.transactions.filter(function(t){return t.projectId===projId&&t.type==='expense';}).reduce(function(s,t){return s+t.amount;},0);
+  var netIncome=pAccInc;   // خالص دریافتی از اکونت اختصاصی
+  var balance=pAccBal;     // باقی‌مانده = دریافتی − مصارف اکونت‌ها
+
+  // donations برای جدول ردیف‌ها
   var donations=DB.donations.filter(function(d){return d.projectId===projId;});
   var grossTotal=donations.reduce(function(s,d){return s+(d.grossAmount||d.amount);},0);
   var adminFeeTotal=donations.reduce(function(s,d){return s+(d.commission||0);},0);
   var netDons=donations.reduce(function(s,d){return s+d.amount;},0);
   var piTxs=DB.transactions.filter(function(t){return t.projectId===projId&&t.isProjectIncome;});
-  var piGross=piTxs.reduce(function(s,t){return s+(t.grossAmount||t.amount);},0);
-  var piFee=piTxs.reduce(function(s,t){return s+(t.adminFee||0);},0);
   var txInc=DB.transactions.filter(function(t){return t.projectId===projId&&t.type==='income';}).reduce(function(s,t){return s+t.amount;},0);
-  var txExp=DB.transactions.filter(function(t){return t.projectId===projId&&t.type==='expense';}).reduce(function(s,t){return s+t.amount;},0);
-  var allGross=grossTotal+piGross;
-  var allFee=adminFeeTotal+piFee;
-  var netIncome=netDons+txInc;  // کل عواید خالص = کمک‌ها + معاملات
-  var balance=netIncome-txExp;
-  // جدول ردیف‌ها
+
+  // ── کارت‌های اکونت برای چاپ ──
+  var pAccRows=pAccData.map(function(x){
+    var bc=x.bal>=0?'#1e40af':'#dc2626';
+    var bb=x.bal>=0?'background:#dbeafe;border:1px solid #93c5fd':'background:#fee2e2;border:1px solid #fca5a5';
+    return '<div style="'+bb+';border-radius:7px;padding:6px 10px;break-inside:avoid">'
+      +'<div style="font-size:8.5pt;font-weight:bold;color:#1e3a5f;margin-bottom:2px">'+(x.a.code?x.a.code+' — ':'')+x.a.name+'</div>'
+      +'<div style="font-size:8pt;margin-bottom:2px">'
+      +(x.inc>0?'<span style="color:#166534">↑ عواید: '+AFN(x.inc)+'</span> ':'')
+      +(x.exp>0?'<span style="color:#dc2626">↓ مصارف: '+AFN(x.exp)+'</span>':'')
+      +(x.inc===0&&x.exp===0?'<span style="color:#94a3b8">بدون معامله</span>':'')
+      +'</div>'
+      +'<div style="font-weight:bold;color:'+bc+'">💵 باقی‌مانده: '+AFN(x.bal)+'</div>'
+      +'</div>';
+  }).join('');
+
+  // ── جدول ردیف‌های دفتر کل برای چاپ ──
   var tbl=document.getElementById('proj-ledger-table');
-  var w=window.open('','_blank');
+
+  // ── ساخت سند HTML ──
   var doc='<!DOCTYPE html><html dir="rtl" lang="fa"><head><meta charset="UTF-8">'
     +'<title>'+org+' — دفتر کل — '+p.name+'</title>'
     +'<style>'
     +'*{box-sizing:border-box;margin:0;padding:0}'
     +'@page{size:A4;margin:15mm 12mm}'
     +'body{font-family:Tahoma,Arial,sans-serif;direction:rtl;font-size:11pt;color:#1a202c;background:#fff}'
-    +'.page-header{display:flex;align-items:center;gap:16px;padding:12px 16px;background:#0d2137;color:#fff;margin-bottom:12px;border-radius:0}'
-    +'.page-header .logo-wrap{flex-shrink:0}'
-    +'.page-header .info{flex:1}'
+    +'.page-header{display:flex;align-items:center;gap:16px;padding:12px 16px;background:#0d2137;color:#fff;margin-bottom:12px}'
     +'.page-header .info h1{font-size:14pt;font-weight:bold;margin-bottom:3px}'
     +'.page-header .info p{font-size:9pt;color:#94a3b8;margin:1px 0}'
-    +'.page-header .date-col{font-size:9pt;color:#94a3b8;text-align:left;white-space:nowrap}'
-    +'.summary-box{border:2px solid #166534;border-radius:8px;margin-bottom:12px;overflow:hidden}'
-    +'.summary-box .s-row{display:flex;align-items:stretch;border-bottom:1px solid #dcfce7}'
-    +'.summary-box .s-row:last-child{border-bottom:none}'
-    +'.summary-box .s-cell{flex:1;padding:8px 14px;border-left:1px solid #dcfce7}'
-    +'.summary-box .s-cell:last-child{border-left:none}'
-    +'.summary-box .s-label{font-size:8.5pt;color:#64748b;margin-bottom:3px}'
-    +'.summary-box .s-val{font-size:12pt;font-weight:bold}'
-    +'.green-bg{background:#f0fdf4}.amber-bg{background:#fffbeb}.blue-bg{background:#eff6ff}.red-bg{background:#fff5f5}'
+    +'.page-header .date-col{font-size:9pt;color:#94a3b8;text-align:left;white-space:nowrap;margin-right:auto}'
+    +'.summary-box{border:2px solid #1e3a5f;border-radius:8px;margin-bottom:12px;overflow:hidden}'
+    +'.s-acc-row{background:#eff6ff;padding:10px 14px;border-bottom:2px solid #bfdbfe}'
+    +'.s-acc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px;margin-top:6px}'
+    +'.s-totals{display:flex;border-bottom:1px solid #dcfce7}'
+    +'.s-cell{flex:1;padding:8px 14px;border-right:1px solid #e2e8f0}'
+    +'.s-cell:first-child{border-right:none}'
+    +'.s-label{font-size:8.5pt;color:#64748b;margin-bottom:3px}'
+    +'.s-val{font-size:12pt;font-weight:bold}'
+    +'.green-bg{background:#f0fdf4}.blue-bg{background:#eff6ff}.red-bg{background:#fff5f5}'
     +'table{width:100%;border-collapse:collapse;font-size:9.5pt;margin-top:8px}'
     +'thead th{background:#1e3a5f;color:#fff;padding:7px 10px;text-align:right;font-weight:bold;white-space:nowrap}'
     +'tbody tr:nth-child(even){background:#f8fafc}'
@@ -5423,14 +5453,17 @@ function printProjLedger(){
     +'tbody td{padding:6px 10px;border-bottom:1px solid #e2e8f0;vertical-align:middle}'
     +'.bal-col{font-weight:bold;white-space:nowrap}'
     +'.amt-col{font-weight:bold;white-space:nowrap;text-align:left}'
-    +'.type-badge{display:inline-block;padding:2px 7px;border-radius:4px;font-size:8pt;font-weight:bold}'
-    +'.badge-inc{background:#dcfce7;color:#166534}'
-    +'.badge-exp{background:#fee2e2;color:#991b1b}'
-    +'.badge-gross{background:#dcfce7;color:#14532d}'
-    +'.badge-fee{background:#fef3c7;color:#92400e}'
+    +'.badge-inc{display:inline-block;padding:2px 7px;border-radius:4px;font-size:8pt;font-weight:bold;background:#dcfce7;color:#166534}'
+    +'.badge-exp{display:inline-block;padding:2px 7px;border-radius:4px;font-size:8pt;font-weight:bold;background:#fee2e2;color:#991b1b}'
+    +'.badge-gross{display:inline-block;padding:2px 7px;border-radius:4px;font-size:8pt;font-weight:bold;background:#dcfce7;color:#14532d}'
+    +'.badge-fee{display:inline-block;padding:2px 7px;border-radius:4px;font-size:8pt;font-weight:bold;background:#fef3c7;color:#92400e}'
     +'.print-btn{background:#1e3a5f;color:#fff;border:none;padding:8px 20px;border-radius:6px;cursor:pointer;font-size:11pt;margin-bottom:12px;font-family:inherit}'
-    +'@media print{.print-btn{display:none}.page-header{border-radius:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}}'
+    +'tfoot tr{background:#1e3a5f!important;color:#fff}'
+    +'tfoot td{padding:7px 10px;font-weight:bold;border:none}'
+    +'@media print{.print-btn{display:none}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}}'
     +'</style></head><body>'
+    +'<button class="print-btn" onclick="window.print()">🖨️ چاپ</button>'
+    // سربرگ
     +'<div class="page-header">'
     +'<div class="logo-wrap">'+logoHtml+'</div>'
     +'<div class="info">'
@@ -5438,51 +5471,29 @@ function printProjLedger(){
     +'<p>دفتر کل پروژه: <strong style="color:#fff">'+p.name+'</strong></p>'
     +(p.donor?'<p>تمویل‌کننده: '+p.donor+'</p>':'')
     +'<p>دوره: '+(p.startDate||'—')+' تا '+(p.endDate||'جاری')+'</p>'
-    +(_projLedgerAccFilter?(()=>{const af=DB.accounts.find(a=>a.id===parseInt(_projLedgerAccFilter));return af?'<p style="color:#fde68a">🔍 فیلتر قلم مصرف: '+(af.code?af.code+' — ':'')+af.name+'</p>':''})():'')
+    +(_projLedgerAccFilter?(function(){var af=DB.accounts.find(function(a){return a.id===parseInt(_projLedgerAccFilter);});return af?'<p style="color:#fde68a">🔍 فیلتر: '+(af.code?af.code+' — ':'')+af.name+'</p>':'';}()):'')
     +'</div>'
     +'<div class="date-col">تاریخ چاپ:<br><strong style="color:#fff">'+today()+'</strong></div>'
     +'</div>'
-    // اکونت‌های اختصاصی — محاسبه برای چاپ
-    var pAccounts=DB.accounts.filter(function(a){return a.projectId&&String(a.projectId)===String(projId);});
-    var pAccData=pAccounts.map(function(a){
-      var txs=DB.transactions.filter(function(t){return t.projectId===projId&&t.accountId===a.id;});
-      var inc=txs.filter(function(t){return t.type==='income';}).reduce(function(s,t){return s+t.amount;},0);
-      var exp=txs.filter(function(t){return t.type==='expense';}).reduce(function(s,t){return s+t.amount;},0);
-      return {a:a,inc:inc,exp:exp,bal:inc-exp};
-    });
-    var pAccRows=pAccData.map(function(x){
-      var bc=x.bal>=0?'#1e40af':'#dc2626';
-      var bb=x.bal>=0?'background:#dbeafe;border:1px solid #93c5fd':'background:#fee2e2;border:1px solid #fca5a5';
-      return '<div style="'+bb+';border-radius:7px;padding:6px 10px">'
-        +'<div style="font-size:8.5pt;font-weight:bold;color:#1e3a5f;margin-bottom:2px">'+(x.a.code?x.a.code+' — ':'')+x.a.name+'</div>'
-        +'<div style="font-size:8pt;display:flex;gap:8px;margin-bottom:2px">'
-        +(x.inc>0?'<span style="color:#166534">↑ '+AFN(x.inc)+'</span>':'')
-        +(x.exp>0?'<span style="color:#dc2626">↓ '+AFN(x.exp)+'</span>':'')
-        +(x.inc===0&&x.exp===0?'<span style="color:#94a3b8">بدون معامله</span>':'')
-        +'</div>'
-        +'<div style="font-size:9pt;font-weight:bold;color:'+bc+'">💵 '+AFN(x.bal)+'</div>'
-        +'</div>';
-    }).join('');
-    // خلاصه مالی چاپ
+    // ── خلاصه مالی ──
     +'<div class="summary-box">'
-    // ردیف اول: اکونت‌های اختصاصی
+    // ردیف اکونت‌های اختصاصی
     +(pAccounts.length>0
-      ?'<div class="s-row" style="background:#eff6ff">'
-       +'<div style="padding:8px 14px;width:100%">'
-       +'<div style="font-size:9pt;font-weight:bold;color:#1e40af;margin-bottom:6px">📁 اکونت‌های اختصاصی پروژه ('+pAccounts.length+' حساب)</div>'
-       +'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:5px">'+pAccRows+'</div>'
-       +'</div></div>'
+      ?'<div class="s-acc-row">'
+       +'<div style="font-size:9.5pt;font-weight:bold;color:#1e40af">📁 اکونت‌های اختصاصی پروژه ('+pAccounts.length+' حساب)</div>'
+       +'<div class="s-acc-grid">'+pAccRows+'</div>'
+       +'</div>'
       :'')
-    // ردیف دوم: خالص دریافتی + مصرف‌شده + باقی‌مانده
-    +'<div class="s-row">'
-    +'<div class="s-cell blue-bg"><div class="s-label">✅ مبلغ خالص دریافتی</div><div class="s-val" style="color:#1e40af">'+AFN(netIncome)+'</div></div>'
-    +'<div class="s-cell red-bg"><div class="s-label">📊 مصرف‌شده</div><div class="s-val" style="color:#dc2626">'+AFN(txExp)+'</div></div>'
+    // ردیف خالص دریافتی → مصارف → باقی‌مانده
+    +'<div class="s-totals">'
+    +'<div class="s-cell blue-bg"><div class="s-label">✅ مبلغ خالص دریافتی (اکونت اختصاصی)</div><div class="s-val" style="color:#1e40af">'+AFN(netIncome)+'</div></div>'
+    +'<div class="s-cell red-bg"><div class="s-label">📊 مجموع مصارف</div><div class="s-val" style="color:#dc2626">'+AFN(pAccExp)+'</div></div>'
     +'<div class="s-cell '+(balance>=0?'green-bg':'red-bg')+'"><div class="s-label">💵 باقی‌مانده</div><div class="s-val" style="color:'+(balance>=0?'#166534':'#dc2626')+'">'+AFN(balance)+'</div></div>'
     +(p.budget>0?'<div class="s-cell"><div class="s-label">📋 سقف بودجه</div><div class="s-val" style="color:#1e3a5f">'+AFN(p.budget)+'</div></div>':'')
     +'</div>'
     +'</div>'
-    +'<button class="print-btn" onclick="window.print()">🖨️ چاپ</button>'
-    +(tbl?tbl.outerHTML.replace(/class="btn[^"]*"[^>]*>[^<]*<\/button>/g,''):'<p>محتوا موجود نیست</p>')
+    // ── جدول دفتر کل ──
+    +(tbl?tbl.outerHTML.replace(/class="btn[^"]*"[^>]*>[^<]*<\/button>/g,''):'<p style="text-align:center;color:#64748b;padding:20px">هیچ معامله‌ای ثبت نشده</p>')
     +'</body></html>';
   w.document.write(doc);
   w.document.close();
