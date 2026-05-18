@@ -1,0 +1,18 @@
+{
+  "name": "orphan-prosperity",
+  "version": "2.0.0",
+  "description": "Orphan Prosperity Financial System – Optimized",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "engines": { "node": ">=18.0.0" },
+  "dependencies": {
+    "compression": "^1.7.4",
+    "express": "^4.22.1",
+    "mongoose": "^8.2.0",
+    "multer": "^1.4.5-lts.1",
+    "sharp": "^0.33.3"
+  }
+}

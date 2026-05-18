@@ -1,0 +1,890 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>مرورگر دیتابیس</title>
+<link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:      #0b0d14;
+  --s1:      #131620;
+  --s2:      #1a1e2e;
+  --s3:      #222740;
+  --bdr:     #272c45;
+  --gold:    #c9a84c;
+  --gold2:   #e8c97a;
+  --teal:    #38c9c9;
+  --red:     #e05a6b;
+  --green:   #4caf8a;
+  --blue:    #5b8cf5;
+  --purple:  #9b7fe8;
+  --orange:  #e88a3a;
+  --text:    #e2e4f0;
+  --text2:   #8791b5;
+  --text3:   #44506a;
+  --r:       10px;
+  --ff:      'Vazirmatn', sans-serif;
+  --mono:    'JetBrains Mono', monospace;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 15px; -webkit-text-size-adjust: 100%; }
+body { background: var(--bg); color: var(--text); font-family: var(--ff); min-height: 100vh; }
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: var(--s1); }
+::-webkit-scrollbar-thumb { background: var(--bdr); border-radius: 3px; }
+
+/* ══ SCREENS ══════════════════════════════════════════════ */
+.screen { display: none; min-height: 100vh; }
+.screen.on { display: flex; }
+
+/* ══ LOGIN ════════════════════════════════════════════════ */
+#sLogin {
+  align-items: center; justify-content: center; padding: 1.5rem;
+  background:
+    radial-gradient(ellipse at 15% 40%, rgba(201,168,76,.07) 0%, transparent 55%),
+    radial-gradient(ellipse at 85% 70%, rgba(91,140,245,.06) 0%, transparent 55%);
+}
+.login-box {
+  width: 100%; max-width: 360px;
+  background: var(--s1); border: 1px solid var(--bdr);
+  border-radius: 20px; padding: 2.25rem 1.75rem;
+  box-shadow: 0 24px 64px rgba(0,0,0,.55);
+}
+.login-icon {
+  width: 60px; height: 60px;
+  background: linear-gradient(135deg, var(--gold), var(--gold2));
+  border-radius: 14px; display: flex; align-items: center; justify-content: center;
+  font-size: 26px; margin: 0 auto 1.25rem;
+  box-shadow: 0 8px 24px rgba(201,168,76,.3);
+}
+.login-title { text-align: center; font-size: 1.15rem; font-weight: 700; margin-bottom: .3rem; }
+.login-sub   { text-align: center; font-size: .78rem; color: var(--text2); margin-bottom: 1.75rem; }
+.field { margin-bottom: 1rem; }
+.field label { display: block; font-size: .74rem; font-weight: 600; color: var(--text2); margin-bottom: .4rem; text-transform: uppercase; letter-spacing: .7px; }
+.field input {
+  width: 100%; background: var(--bg); border: 1px solid var(--bdr);
+  border-radius: var(--r); padding: .75rem .9rem; color: var(--text);
+  font-family: var(--ff); font-size: .92rem; outline: none;
+  transition: border-color .2s, box-shadow .2s; direction: ltr; text-align: right;
+}
+.field input:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(201,168,76,.12); }
+.btn-login {
+  width: 100%; margin-top: .5rem;
+  padding: .85rem; background: linear-gradient(135deg, var(--gold), var(--gold2));
+  border: none; border-radius: var(--r); color: #140f00;
+  font-family: var(--ff); font-size: .95rem; font-weight: 700;
+  cursor: pointer; transition: transform .15s, box-shadow .2s;
+}
+.btn-login:hover  { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(201,168,76,.35); }
+.btn-login:active { transform: translateY(0); }
+.btn-login:disabled { opacity: .6; cursor: not-allowed; transform: none; }
+.err-msg {
+  background: rgba(224,90,107,.1); border: 1px solid rgba(224,90,107,.3);
+  border-radius: 8px; padding: .65rem .9rem;
+  color: var(--red); font-size: .82rem; margin-bottom: .9rem;
+  display: none; text-align: center;
+}
+
+/* ══ APP SHELL ════════════════════════════════════════════ */
+#sApp { flex-direction: column; }
+
+/* Top Bar */
+.topbar {
+  position: sticky; top: 0; z-index: 100;
+  background: var(--s1); border-bottom: 1px solid var(--bdr);
+  height: 52px; padding: 0 1rem;
+  display: flex; align-items: center; gap: .75rem;
+}
+.topbar-logo { font-size: .9rem; font-weight: 700; color: var(--gold); flex: 1; }
+.topbar-user { font-size: .73rem; color: var(--text2); display: flex; align-items: center; gap: .35rem; }
+.role-chip {
+  background: var(--s3); border: 1px solid var(--bdr);
+  border-radius: 6px; padding: .12rem .45rem;
+  font-size: .66rem; color: var(--gold); font-weight: 600;
+}
+.btn-out {
+  background: none; border: 1px solid var(--bdr); border-radius: 7px;
+  padding: .35rem .6rem; color: var(--text2); font-family: var(--ff);
+  font-size: .72rem; cursor: pointer; transition: all .18s;
+}
+.btn-out:hover { border-color: var(--red); color: var(--red); }
+
+/* Collection Tabs */
+.coll-bar {
+  display: flex; gap: .35rem; padding: .65rem .9rem;
+  overflow-x: auto; border-bottom: 1px solid var(--bdr);
+  background: var(--s1); scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.coll-bar::-webkit-scrollbar { display: none; }
+.ctab {
+  flex-shrink: 0; padding: .45rem .8rem;
+  background: var(--s2); border: 1px solid var(--bdr);
+  border-radius: 8px; color: var(--text2); font-family: var(--ff);
+  font-size: .77rem; font-weight: 500; cursor: pointer;
+  transition: all .18s; white-space: nowrap;
+  display: flex; align-items: center; gap: .35rem;
+}
+.ctab:hover { border-color: var(--gold); color: var(--text); }
+.ctab.on { background: rgba(201,168,76,.1); border-color: var(--gold); color: var(--gold); }
+.ctab .n { background: var(--s3); border-radius: 4px; padding: .05rem .38rem; font-size: .66rem; color: var(--text2); }
+.ctab.on .n { background: rgba(201,168,76,.2); color: var(--gold2); }
+
+/* Toolbar */
+.toolbar { display: flex; gap: .5rem; padding: .65rem .9rem; align-items: center; flex-wrap: wrap; }
+.srch { flex: 1; min-width: 140px; position: relative; }
+.srch input {
+  width: 100%; background: var(--s2); border: 1px solid var(--bdr);
+  border-radius: var(--r); padding: .55rem .85rem .55rem 2.2rem;
+  color: var(--text); font-family: var(--ff); font-size: .82rem;
+  outline: none; transition: border-color .2s; direction: rtl;
+}
+.srch input:focus { border-color: var(--gold); }
+.srch-ic { position: absolute; left: .7rem; top: 50%; transform: translateY(-50%); color: var(--text3); font-size: 13px; pointer-events: none; }
+.bs {
+  padding: .5rem .8rem; background: var(--s2); border: 1px solid var(--bdr);
+  border-radius: var(--r); color: var(--text2); font-family: var(--ff);
+  font-size: .77rem; cursor: pointer; transition: all .18s; white-space: nowrap;
+  display: flex; align-items: center; gap: .3rem;
+}
+.bs:hover { border-color: var(--gold); color: var(--gold); }
+.bs.pri { background: rgba(201,168,76,.1); border-color: var(--gold); color: var(--gold); }
+
+/* Filter Chips */
+.frow {
+  display: flex; gap: .35rem; padding: 0 .9rem .65rem;
+  overflow-x: auto; scrollbar-width: none;
+}
+.frow::-webkit-scrollbar { display: none; }
+.fchip {
+  flex-shrink: 0; padding: .3rem .65rem;
+  background: var(--s2); border: 1px solid var(--bdr);
+  border-radius: 20px; font-size: .72rem; color: var(--text2);
+  cursor: pointer; transition: all .18s; white-space: nowrap;
+}
+.fchip:hover { border-color: var(--gold); }
+.fchip.on { background: rgba(201,168,76,.1); border-color: var(--gold); color: var(--gold); }
+
+/* Content */
+.content { flex: 1; overflow-y: auto; padding: .9rem; }
+
+/* States */
+.state {
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; padding: 4rem 1rem; color: var(--text3); gap: .65rem;
+  font-size: .88rem;
+}
+.spin {
+  width: 30px; height: 30px;
+  border: 3px solid var(--bdr); border-top-color: var(--gold);
+  border-radius: 50%; animation: spin .65s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Grid */
+.grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: .65rem;
+}
+@media (min-width: 540px)  { .grid { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 820px)  { .grid { grid-template-columns: repeat(3, 1fr); } }
+@media (min-width: 1100px) { .grid { grid-template-columns: repeat(4, 1fr); } }
+
+/* Card */
+.card {
+  background: var(--s1); border: 1px solid var(--bdr);
+  border-radius: 12px; padding: .9rem 1rem;
+  cursor: pointer; transition: border-color .18s, transform .13s;
+  position: relative; overflow: hidden;
+}
+.card::after {
+  content: ''; position: absolute; right: 0; top: 0;
+  width: 3px; height: 100%; background: var(--bdr); transition: background .18s;
+}
+.card:hover { border-color: rgba(201,168,76,.4); transform: translateY(-1px); }
+.card:hover::after { background: var(--gold); }
+.card.sel { border-color: var(--gold); background: rgba(201,168,76,.04); }
+.card.sel::after { background: var(--gold); }
+.c-id { font-family: var(--mono); font-size: .65rem; color: var(--text3); margin-bottom: .35rem; }
+.c-name { font-size: .9rem; font-weight: 600; color: var(--text); margin-bottom: .45rem; line-height: 1.3; }
+.c-tags { display: flex; flex-wrap: wrap; gap: .25rem; }
+.tag { padding: .18rem .45rem; border-radius: 4px; font-size: .67rem; font-weight: 500; }
+.tg { background: rgba(76,175,138,.14); color: var(--green); }
+.tr { background: rgba(224,90,107,.14); color: var(--red); }
+.ty { background: rgba(201,168,76,.14); color: var(--gold); }
+.tb { background: rgba(91,140,245,.14); color: var(--blue); }
+.tgr{ background: var(--s2); color: var(--text2); }
+.tp { background: rgba(155,127,232,.14); color: var(--purple); }
+.to { background: rgba(232,138,58,.14); color: var(--orange); }
+
+/* Pager */
+.pager { display: flex; align-items: center; gap: .4rem; padding: .9rem 0; justify-content: center; flex-wrap: wrap; }
+.pg {
+  padding: .4rem .7rem; background: var(--s2); border: 1px solid var(--bdr);
+  border-radius: 7px; color: var(--text2); font-family: var(--ff);
+  font-size: .77rem; cursor: pointer; transition: all .18s;
+}
+.pg:hover:not(:disabled) { border-color: var(--gold); color: var(--gold); }
+.pg:disabled { opacity: .35; cursor: default; }
+.pg.on { background: rgba(201,168,76,.1); border-color: var(--gold); color: var(--gold); font-weight: 600; }
+.pg-info { font-size: .75rem; color: var(--text2); }
+
+/* ══ DETAIL PANEL ══════════════════════════════════════════ */
+.overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,.55); z-index: 200; backdrop-filter: blur(4px);
+}
+.overlay.on { display: block; }
+.panel {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  background: var(--s1); border-top: 1px solid var(--bdr);
+  border-radius: 18px 18px 0 0; max-height: 82vh; overflow-y: auto;
+  z-index: 201; transform: translateY(100%);
+  transition: transform .28s cubic-bezier(.32,.72,0,1);
+  padding: 1.1rem 1.1rem 2.5rem;
+}
+@media (min-width: 680px) {
+  .panel {
+    top: 0; bottom: 0; right: 0; left: auto;
+    width: min(420px, 90vw); border-radius: 0;
+    border-top: none; border-left: 1px solid var(--bdr);
+    max-height: none; transform: translateX(100%);
+    transition: transform .28s cubic-bezier(.32,.72,0,1);
+  }
+  .overlay.on .panel { transform: translateX(0); }
+}
+.overlay.on .panel { transform: translateY(0); }
+
+.pull { width: 38px; height: 4px; background: var(--bdr); border-radius: 2px; margin: 0 auto .7rem; }
+@media (min-width: 680px) { .pull { display: none; } }
+
+.p-head { display: flex; align-items: flex-start; gap: .7rem; margin-bottom: 1.1rem; }
+.p-avatar {
+  width: 46px; height: 46px; background: var(--s2); border: 1px solid var(--bdr);
+  border-radius: 11px; display: flex; align-items: center; justify-content: center;
+  font-size: 20px; flex-shrink: 0; overflow: hidden;
+}
+.p-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.p-info { flex: 1; min-width: 0; }
+.p-name { font-size: 1rem; font-weight: 700; color: var(--text); margin-bottom: .2rem; word-break: break-word; }
+.p-sub  { font-family: var(--mono); font-size: .68rem; color: var(--text3); }
+.btn-px {
+  background: var(--s2); border: 1px solid var(--bdr); border-radius: 7px;
+  padding: .42rem .55rem; color: var(--text2); cursor: pointer;
+  font-size: 13px; transition: all .18s; flex-shrink: 0;
+}
+.btn-px:hover { border-color: var(--red); color: var(--red); }
+
+.sec { margin-bottom: 1.1rem; }
+.sec-t {
+  font-size: .68rem; font-weight: 600; color: var(--text3);
+  text-transform: uppercase; letter-spacing: .9px;
+  margin-bottom: .5rem; padding-bottom: .35rem; border-bottom: 1px solid var(--bdr);
+}
+.row {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  gap: .7rem; padding: .4rem 0; border-bottom: 1px solid rgba(39,44,69,.5);
+  font-size: .82rem;
+}
+.row:last-child { border-bottom: none; }
+.rl { color: var(--text2); flex-shrink: 0; }
+.rv { color: var(--text); text-align: left; word-break: break-word; direction: rtl; }
+.rv.mono { font-family: var(--mono); font-size: .75rem; color: var(--teal); direction: ltr; }
+.rv.amt-pos { color: var(--green); font-weight: 600; }
+.rv.amt-neg { color: var(--red);   font-weight: 600; }
+
+.json-box {
+  background: var(--bg); border: 1px solid var(--bdr); border-radius: var(--r);
+  padding: .75rem .9rem; font-family: var(--mono); font-size: .72rem;
+  color: var(--text2); overflow-x: auto; white-space: pre; max-height: 280px;
+  overflow-y: auto; direction: ltr; text-align: left;
+}
+
+/* Stats pills */
+.stats { display: flex; gap: .4rem; flex-wrap: wrap; padding: 0 .9rem .65rem; }
+.pill {
+  background: var(--s2); border: 1px solid var(--bdr); border-radius: 7px;
+  padding: .35rem .65rem; font-size: .75rem; color: var(--text2);
+  display: flex; align-items: center; gap: .3rem;
+}
+.pill strong { color: var(--text); }
+.pill.y strong { color: var(--gold); }
+.pill.g strong { color: var(--green); }
+.pill.b strong { color: var(--blue); }
+
+/* Toast */
+.toast {
+  position: fixed; bottom: 1.5rem; left: 50%;
+  transform: translateX(-50%) translateY(80px);
+  background: var(--s1); border: 1px solid var(--bdr); border-radius: 11px;
+  padding: .65rem 1.1rem; font-size: .82rem; color: var(--text);
+  z-index: 999; box-shadow: 0 12px 32px rgba(0,0,0,.4);
+  transition: transform .22s; white-space: nowrap;
+}
+.toast.on  { transform: translateX(-50%) translateY(0); }
+.toast.ok  { border-color: var(--green); color: var(--green); }
+.toast.err { border-color: var(--red); color: var(--red); }
+
+/* Health cards */
+.hgrid { display: grid; grid-template-columns: 1fr 1fr; gap: .65rem; margin-bottom: .9rem; }
+@media (min-width: 540px) { .hgrid { grid-template-columns: repeat(4, 1fr); } }
+.hcard { background: var(--s1); border: 1px solid var(--bdr); border-radius: 11px; padding: .9rem; text-align: center; }
+.hval { font-size: 1.35rem; font-weight: 700; color: var(--gold); display: block; margin-bottom: .2rem; }
+.hlbl { font-size: .72rem; color: var(--text2); }
+
+/* Amount display */
+.num { font-family: var(--mono); }
+</style>
+</head>
+<body>
+
+<!-- ══ LOGIN ════════════════════════════════════════════════ -->
+<div class="screen on" id="sLogin">
+  <div class="login-box">
+    <div class="login-icon">🗄️</div>
+    <div class="login-title">مرورگر دیتابیس</div>
+    <div class="login-sub">Orphan Prosperity — DB Browser</div>
+    <div class="err-msg" id="loginErr"></div>
+    <div class="field">
+      <label>نام کاربری</label>
+      <input id="lu" type="text" placeholder="admin" autocomplete="username" autocapitalize="none" value="admin">
+    </div>
+    <div class="field">
+      <label>رمز عبور</label>
+      <input id="lp" type="password" placeholder="••••••" autocomplete="current-password">
+    </div>
+    <button class="btn-login" id="loginBtn" onclick="doLogin()">ورود به سیستم</button>
+  </div>
+</div>
+
+<!-- ══ APP ═══════════════════════════════════════════════════ -->
+<div class="screen" id="sApp">
+
+  <div class="topbar">
+    <div class="topbar-logo">🗄️ DB Browser</div>
+    <div class="topbar-user">
+      <span id="uName"></span>
+      <span class="role-chip" id="uRole"></span>
+    </div>
+    <button class="btn-out" onclick="logout()">خروج</button>
+  </div>
+
+  <div class="coll-bar" id="collBar"></div>
+
+  <div class="stats" id="statsRow" style="display:none"></div>
+  <div class="frow" id="frow" style="display:none"></div>
+
+  <div class="toolbar">
+    <div class="srch">
+      <span class="srch-ic">🔍</span>
+      <input id="srch" type="search" placeholder="جستجو در رکوردها..." oninput="onSearch()">
+    </div>
+    <button class="bs" onclick="reload()">↻ بروزرسانی</button>
+    <button class="bs" onclick="copyJSON()">📋 کپی JSON</button>
+  </div>
+
+  <div class="content" id="content">
+    <div class="state"><div class="spin"></div><span>در حال بارگذاری...</span></div>
+  </div>
+</div>
+
+<!-- Detail Overlay -->
+<div class="overlay" id="overlay" onclick="closePanel(event)">
+  <div class="panel" id="panel">
+    <div class="pull"></div>
+    <div class="p-head">
+      <div class="p-avatar" id="pAv">?</div>
+      <div class="p-info">
+        <div class="p-name" id="pName">—</div>
+        <div class="p-sub"  id="pSub">—</div>
+      </div>
+      <button class="btn-px" onclick="closePanel()">✕</button>
+    </div>
+    <div id="pBody"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ─── State ────────────────────────────────────────────────
+let DB = null;
+let currentUser = null;
+let coll = 'summary';
+let allRows = [], filtered = [], page = 1;
+const PER = 24;
+let activeF = '';
+let srchQ  = '';
+let pickedRec = null;
+
+const SESS_KEY = 'dbv15_session';
+
+// ─── Collections config ───────────────────────────────────
+const COLLS = [
+  { key:'summary',      label:'خلاصه',       icon:'📊', arr: null },
+  { key:'users',        label:'کاربران',      icon:'👤', arr:'users' },
+  { key:'donors',       label:'کمک‌کنندگان',  icon:'💚', arr:'donors' },
+  { key:'sponsors',     label:'حامیان',       icon:'🤝', arr:'sponsors' },
+  { key:'projects',     label:'پروژه‌ها',      icon:'📁', arr:'projects' },
+  { key:'donations',    label:'کمک‌های مالی', icon:'💰', arr:'donations' },
+  { key:'transactions', label:'تراکنش‌ها',    icon:'📑', arr:'transactions' },
+  { key:'accounts',     label:'حساب‌ها',      icon:'📒', arr:'accounts' },
+  { key:'employees',    label:'کارمندان',     icon:'🧑‍💼',arr:'employees' },
+  { key:'assets',       label:'دارایی‌ها',     icon:'🏢', arr:'assets' },
+  { key:'loans',        label:'قروض',         icon:'💳', arr:'loans' },
+  { key:'health',       label:'سرور',         icon:'⚙️', arr: null },
+];
+
+// ─── Boot ─────────────────────────────────────────────────
+window.onload = () => {
+  // Try resume session
+  try {
+    const s = JSON.parse(sessionStorage.getItem(SESS_KEY));
+    if (s && s.userId && s.dbSnap) {
+      DB = s.dbSnap;
+      currentUser = (DB.users || []).find(u => u.id === s.userId);
+      if (currentUser) { enterApp(); return; }
+    }
+  } catch(e) {}
+
+  // Show login, pre-fill enter key
+  document.getElementById('lp').onkeydown = e => { if (e.key === 'Enter') doLogin(); };
+  document.getElementById('lu').onkeydown = e => { if (e.key === 'Enter') document.getElementById('lp').focus(); };
+};
+
+// ─── Auth ─────────────────────────────────────────────────
+async function doLogin() {
+  const btn = document.getElementById('loginBtn');
+  const err = document.getElementById('loginErr');
+  const u   = (document.getElementById('lu').value || '').trim();
+  const p   = (document.getElementById('lp').value || '').trim();
+
+  err.style.display = 'none';
+  if (!u || !p) { showErr('نام کاربری و رمز عبور الزامی است'); return; }
+
+  btn.disabled = true;
+  btn.textContent = 'در حال بارگذاری...';
+
+  try {
+    // Fetch DB from server (no server-side auth — auth is client-side like main app)
+    const res  = await fetch('/api/db');
+    const json = await res.json();
+    if (!json.ok || !json.data) throw new Error('دیتابیس پاسخ نداد');
+
+    DB = json.data;
+    const users = DB.users || [];
+    const found = users.find(x => x.username === u && x.password === p);
+
+    if (!found) { showErr('نام کاربری یا رمز عبور اشتباه است'); return; }
+
+    currentUser = found;
+
+    // Save session in sessionStorage (clears on tab close — safer)
+    sessionStorage.setItem(SESS_KEY, JSON.stringify({ userId: found.id, dbSnap: DB }));
+
+    enterApp();
+  } catch(e) {
+    showErr(e.message || 'خطا در اتصال به سرور');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'ورود به سیستم';
+  }
+
+  function showErr(msg) { err.textContent = msg; err.style.display = 'block'; }
+}
+
+function logout() {
+  currentUser = null; DB = null;
+  sessionStorage.removeItem(SESS_KEY);
+  document.getElementById('sLogin').classList.add('on');
+  document.getElementById('sApp').classList.remove('on');
+  document.getElementById('lp').value = '';
+  document.getElementById('loginErr').style.display = 'none';
+}
+
+// ─── App shell ────────────────────────────────────────────
+function enterApp() {
+  document.getElementById('sLogin').classList.remove('on');
+  document.getElementById('sApp').classList.add('on');
+  document.getElementById('uName').textContent = currentUser.name || currentUser.username;
+  document.getElementById('uRole').textContent = currentUser.role;
+  buildTabs();
+  showColl('summary');
+}
+
+function buildTabs() {
+  const el = document.getElementById('collBar');
+  el.innerHTML = COLLS.map(c => {
+    const arr = c.arr ? (DB[c.arr] || []) : [];
+    return `<button class="ctab ${c.key === coll ? 'on' : ''}" id="ct-${c.key}" onclick="showColl('${c.key}')">
+      ${c.icon} ${c.label}
+      ${c.arr ? `<span class="n">${arr.length}</span>` : ''}
+    </button>`;
+  }).join('');
+}
+
+// ─── Collection switch ────────────────────────────────────
+function showColl(key) {
+  coll = key; page = 1; srchQ = ''; activeF = '';
+  document.getElementById('srch').value = '';
+  document.querySelectorAll('.ctab').forEach(t => t.classList.remove('on'));
+  const tab = document.getElementById('ct-' + key);
+  if (tab) tab.classList.add('on');
+  closePanel();
+
+  const cfg = COLLS.find(c => c.key === key);
+  allRows = cfg && cfg.arr ? (DB[cfg.arr] || []) : [];
+  filtered = [...allRows];
+
+  renderStats(key);
+  renderFilters(key);
+  renderContent();
+}
+
+function reload() {
+  fetch('/api/db')
+    .then(r => r.json())
+    .then(j => {
+      if (j.ok && j.data) {
+        DB = j.data;
+        sessionStorage.setItem(SESS_KEY, JSON.stringify({ userId: currentUser.id, dbSnap: DB }));
+        buildTabs();
+        showColl(coll);
+        toast('✅ داده بروز شد', 'ok');
+      }
+    })
+    .catch(() => toast('❌ خطا در بروزرسانی', 'err'));
+}
+
+// ─── Stats ────────────────────────────────────────────────
+function renderStats(key) {
+  const el = document.getElementById('statsRow');
+  if (key === 'donations') {
+    const rows = DB.donations || [];
+    const total = rows.reduce((s, d) => s + (d.amount || 0), 0);
+    el.style.display = 'flex';
+    el.innerHTML = `
+      <div class="pill y">مجموع: <strong>${rows.length}</strong></div>
+      <div class="pill g">مبلغ کل: <strong class="num">${fmt(total)}</strong></div>`;
+  } else if (key === 'transactions') {
+    const rows = DB.transactions || [];
+    const inc = rows.filter(t => t.type==='income').reduce((s,t)=>s+(t.amount||0),0);
+    const exp = rows.filter(t => t.type==='expense').reduce((s,t)=>s+(t.amount||0),0);
+    el.style.display = 'flex';
+    el.innerHTML = `
+      <div class="pill y">مجموع: <strong>${rows.length}</strong></div>
+      <div class="pill g">عواید: <strong class="num">${fmt(inc)}</strong></div>
+      <div class="pill" style="border-color:rgba(224,90,107,.3)"><strong style="color:var(--red)" class="num">${fmt(exp)}</strong> مصارف</div>`;
+  } else {
+    el.style.display = 'none';
+    el.innerHTML = '';
+  }
+}
+
+// ─── Filters ──────────────────────────────────────────────
+function renderFilters(key) {
+  const el = document.getElementById('frow');
+  let chips = null;
+
+  if (key === 'transactions') chips = [
+    {l:'همه', v:''}, {l:'💰 عواید', v:'income'}, {l:'💸 مصارف', v:'expense'}
+  ];
+  else if (key === 'donations') chips = [
+    {l:'همه', v:''}, {l:'صدقه', v:'صدقه'}, {l:'زکات', v:'زکات'},
+    {l:'افطاری', v:'افطاری'}, {l:'تعلیمی', v:'تعلیمی و تربیتی'}
+  ];
+  else if (key === 'accounts') chips = [
+    {l:'همه', v:''}, {l:'دارایی', v:'Asset'}, {l:'بدهی', v:'Liability'},
+    {l:'حقوق مالی', v:'Equity'}, {l:'عواید', v:'Income'}, {l:'مصارف', v:'Expense'}
+  ];
+
+  if (!chips) { el.style.display = 'none'; return; }
+
+  el.style.display = 'flex';
+  el.innerHTML = chips.map(c =>
+    `<button class="fchip ${activeF===c.v?'on':''}" onclick="setFilter('${c.v}')">${c.l}</button>`
+  ).join('');
+}
+
+function setFilter(v) {
+  activeF = v; page = 1;
+  applyFilter();
+  renderFilters(coll);
+  renderContent();
+}
+
+// ─── Search + Filter ──────────────────────────────────────
+function onSearch() {
+  srchQ = (document.getElementById('srch').value || '').toLowerCase();
+  page = 1; applyFilter(); renderContent();
+}
+
+function applyFilter() {
+  filtered = allRows.filter(r => {
+    if (srchQ) {
+      const hay = JSON.stringify(r).toLowerCase();
+      if (!hay.includes(srchQ)) return false;
+    }
+    if (activeF) {
+      if (coll === 'transactions' && r.type !== activeF) return false;
+      if (coll === 'donations'    && r.category !== activeF) return false;
+      if (coll === 'accounts'     && r.type !== activeF) return false;
+    }
+    return true;
+  });
+}
+
+// ─── Render content area ──────────────────────────────────
+function renderContent() {
+  const el = document.getElementById('content');
+
+  if (coll === 'summary') { renderSummary(); return; }
+  if (coll === 'health')  { renderHealth();  return; }
+
+  if (!filtered.length) {
+    el.innerHTML = '<div class="state">📭 <span>رکوردی یافت نشد</span></div>'; return;
+  }
+
+  const start = (page - 1) * PER;
+  const slice = filtered.slice(start, start + PER);
+  const pages = Math.ceil(filtered.length / PER);
+
+  el.innerHTML = `
+    <div class="grid">${slice.map((r, i) => cardHTML(r, start + i)).join('')}</div>
+    ${pages > 1 ? pagerHTML(pages) : ''}`;
+}
+
+// ─── Card HTML per collection ─────────────────────────────
+function cardHTML(r, idx) {
+  const c = coll;
+
+  if (c === 'users') {
+    const rclr = {admin:'tr', editor:'tg', viewer:'tb'}[r.role] || 'tgr';
+    return card(idx, '👤', r.name || r.username, [
+      `<span class="tag tgr">@${r.username}</span>`,
+      `<span class="tag ${rclr}">${r.role}</span>`
+    ], `ID: ${r.id}`);
+  }
+
+  if (c === 'donors') {
+    return card(idx, '💚', r.name || r.companyName || '(بدون نام)', [
+      r.phone    ? `<span class="tag tgr">📞 ${r.phone}</span>` : '',
+      r.type     ? `<span class="tag tb">${r.type}</span>` : '',
+    ], `ID: ${r.id}`);
+  }
+
+  if (c === 'sponsors') {
+    return card(idx, '🤝', r.name || '(بدون نام)', [
+      r.mobile   ? `<span class="tag tgr">📞 ${r.mobile}</span>` : '',
+      r.isActive===false ? `<span class="tag tr">غیرفعال</span>` : `<span class="tag tg">فعال</span>`,
+    ], `ID: ${r.id}`);
+  }
+
+  if (c === 'projects') {
+    const clr = {active:'tg', completed:'tb', paused:'ty'}[r.status] || 'tgr';
+    return card(idx, '📁', r.name || '(بدون نام)', [
+      r.status ? `<span class="tag ${clr}">${r.status}</span>` : '',
+      r.budget  ? `<span class="tag ty num">${fmt(r.budget)}</span>` : '',
+    ], `ID: ${r.id}`);
+  }
+
+  if (c === 'donations') {
+    return card(idx, '💰', r.donorName || r.description || '(کمک مالی)', [
+      `<span class="tag tg num">${fmt(r.amount)} ${r.currency||''}</span>`,
+      r.category ? `<span class="tag ty">${r.category}</span>` : '',
+      r.date     ? `<span class="tag tgr">${r.date}</span>` : '',
+    ], `#${r.id}`);
+  }
+
+  if (c === 'transactions') {
+    const isInc = r.type === 'income';
+    return card(idx, isInc ? '📈' : '📉', r.description || r.ref || '(تراکنش)', [
+      `<span class="tag ${isInc?'tg':'tr'} num">${isInc?'+':'-'}${fmt(r.amount)}</span>`,
+      r.date ? `<span class="tag tgr">${r.date}</span>` : '',
+      r.paymentMethod ? `<span class="tag tb">${r.paymentMethod}</span>` : '',
+    ], `#${r.id}`);
+  }
+
+  if (c === 'accounts') {
+    const tc = {Asset:'tb', Liability:'tr', Equity:'tp', Income:'tg', Expense:'to'}[r.type]||'tgr';
+    return card(idx, '📒', r.name || r.code, [
+      r.code ? `<span class="tag tgr num">${r.code}</span>` : '',
+      `<span class="tag ${tc}">${r.type}</span>`,
+    ], `ID: ${r.id}`);
+  }
+
+  if (c === 'employees') {
+    return card(idx, '🧑‍💼', r.name || '(کارمند)', [
+      r.position ? `<span class="tag tgr">${r.position}</span>` : '',
+      r.salary   ? `<span class="tag ty num">${fmt(r.salary)}</span>` : '',
+      r.isActive===false ? `<span class="tag tr">غیرفعال</span>` : '',
+    ], `ID: ${r.id}`);
+  }
+
+  if (c === 'assets') {
+    return card(idx, '🏢', r.name || r.type || '(دارایی)', [
+      r.purchasePrice ? `<span class="tag ty num">${fmt(r.purchasePrice)}</span>` : '',
+      r.type ? `<span class="tag tb">${r.type}</span>` : '',
+    ], `ID: ${r.id}`);
+  }
+
+  if (c === 'loans') {
+    return card(idx, '💳', r.description || r.from || '(قرض)', [
+      `<span class="tag tr num">${fmt(r.amount)}</span>`,
+      r.date ? `<span class="tag tgr">${r.date}</span>` : '',
+    ], `ID: ${r.id}`);
+  }
+
+  // Generic fallback
+  const label = r.name || r.title || r.description || r.username || `ردیف ${idx+1}`;
+  return card(idx, '📄', label, [], r.id ? `ID: ${r.id}` : '');
+}
+
+function card(idx, icon, name, tags, sub) {
+  return `<div class="card" onclick="openPanel(${idx})">
+    <div class="c-id">${sub}</div>
+    <div class="c-name">${icon} ${esc(name)}</div>
+    <div class="c-tags">${tags.filter(Boolean).join('')}</div>
+  </div>`;
+}
+
+// ─── Pager ────────────────────────────────────────────────
+function pagerHTML(total) {
+  const s = Math.max(1, page-2), e = Math.min(total, page+2);
+  let h = `<div class="pager">`;
+  h += `<button class="pg" onclick="goP(${page-1})" ${page<=1?'disabled':''}>‹ قبلی</button>`;
+  if (s>1) h += `<button class="pg" onclick="goP(1)">1</button>`;
+  if (s>2) h += `<span class="pg-info">…</span>`;
+  for (let i=s; i<=e; i++) h += `<button class="pg ${i===page?'on':''}" onclick="goP(${i})">${i}</button>`;
+  if (e<total-1) h += `<span class="pg-info">…</span>`;
+  if (e<total)   h += `<button class="pg" onclick="goP(${total})">${total}</button>`;
+  h += `<button class="pg" onclick="goP(${page+1})" ${page>=total?'disabled':''}>بعدی ›</button>`;
+  h += `<span class="pg-info">${filtered.length} رکورد — صفحه ${page}/${total}</span>`;
+  h += `</div>`;
+  return h;
+}
+function goP(n) {
+  page = Math.max(1, Math.min(n, Math.ceil(filtered.length / PER)));
+  renderContent();
+  document.getElementById('content').scrollTop = 0;
+}
+
+// ─── Summary ──────────────────────────────────────────────
+function renderSummary() {
+  const el = document.getElementById('content');
+  const cfg = DB.settings || {};
+  const totDon  = (DB.donations || []).reduce((s,d)=>s+(d.amount||0),0);
+  const totExp  = (DB.transactions || []).filter(t=>t.type==='expense').reduce((s,t)=>s+(t.amount||0),0);
+  const totInc  = (DB.transactions || []).filter(t=>t.type==='income').reduce((s,t)=>s+(t.amount||0),0);
+
+  const rows = COLLS.filter(c => c.arr && DB[c.arr]).map(c => {
+    const arr = DB[c.arr] || [];
+    return `<div class="card" onclick="showColl('${c.key}')">
+      <div class="c-name">${c.icon} ${c.label}</div>
+      <div class="c-tags"><span class="tag ty num">${arr.length} رکورد</span></div>
+    </div>`;
+  });
+
+  el.innerHTML = `
+    <div class="hgrid">
+      <div class="hcard"><span class="hval num">${fmt(totDon)}</span><div class="hlbl">کل کمک‌های دریافتی</div></div>
+      <div class="hcard"><span class="hval num">${fmt(totInc)}</span><div class="hlbl">کل عواید</div></div>
+      <div class="hcard"><span class="hval num" style="color:var(--red)">${fmt(totExp)}</span><div class="hlbl">کل مصارف</div></div>
+      <div class="hcard"><span class="hval num" style="color:var(--green)">${fmt(totInc-totExp)}</span><div class="hlbl">مانده</div></div>
+    </div>
+    <div class="sec-t" style="padding:.5rem .1rem .5rem;font-size:.7rem;color:var(--text3);letter-spacing:.8px;border-bottom:1px solid var(--bdr);margin-bottom:.65rem">مجموعه‌ها</div>
+    <div class="grid">${rows.join('')}</div>
+    <div class="sec-t" style="padding:.75rem .1rem .5rem;font-size:.7rem;color:var(--text3);letter-spacing:.8px;border-bottom:1px solid var(--bdr);margin:.25rem 0 .65rem">تنظیمات سازمان</div>
+    <div class="json-box">${esc(JSON.stringify(cfg, null, 2))}</div>`;
+}
+
+// ─── Health ───────────────────────────────────────────────
+async function renderHealth() {
+  const el = document.getElementById('content');
+  el.innerHTML = '<div class="state"><div class="spin"></div></div>';
+  try {
+    const h = await fetch('/api/health').then(r=>r.json());
+    el.innerHTML = `
+      <div class="hgrid">
+        <div class="hcard"><span class="hval">${h.ok?'✅':'❌'}</span><div class="hlbl">وضعیت</div></div>
+        <div class="hcard"><span class="hval">${h.mongoState||'—'}</span><div class="hlbl">MongoDB</div></div>
+        <div class="hcard"><span class="hval">${Math.floor((h.uptime||0)/60)}m</span><div class="hlbl">آپتایم</div></div>
+        <div class="hcard"><span class="hval num">${h.timestamp?h.timestamp.slice(11,19):'—'}</span><div class="hlbl">زمان سرور</div></div>
+      </div>
+      <div class="sec-t" style="font-size:.7rem;color:var(--text3);letter-spacing:.8px;border-bottom:1px solid var(--bdr);padding-bottom:.35rem;margin-bottom:.65rem">JSON خام</div>
+      <div class="json-box">${esc(JSON.stringify(h, null, 2))}</div>`;
+  } catch(e) {
+    el.innerHTML = `<div class="state">⚠️ <span>${e.message}</span></div>`;
+  }
+}
+
+// ─── Detail Panel ─────────────────────────────────────────
+function openPanel(localIdx) {
+  const start = (page - 1) * PER;
+  const r = filtered[start + localIdx];
+  if (!r) return;
+  pickedRec = r;
+
+  // Avatar + title
+  const icons = {users:'👤',donors:'💚',sponsors:'🤝',projects:'📁',donations:'💰',transactions:'📑',accounts:'📒',employees:'🧑‍💼',assets:'🏢',loans:'💳'};
+  document.getElementById('pAv').textContent = icons[coll] || '📄';
+  document.getElementById('pName').textContent = r.name || r.title || r.description || r.username || '(رکورد)';
+  document.getElementById('pSub').textContent  = 'ID: ' + (r.id || r._id || '—');
+  document.getElementById('pBody').innerHTML   = buildPanelBody(r);
+
+  document.getElementById('overlay').classList.add('on');
+  document.body.style.overflow = 'hidden';
+}
+
+function closePanel(e) {
+  if (e && e.target !== document.getElementById('overlay')) return;
+  document.getElementById('overlay').classList.remove('on');
+  document.body.style.overflow = '';
+  pickedRec = null;
+}
+
+function buildPanelBody(r) {
+  const entries = Object.entries(r).filter(([k]) => k !== '__v');
+  let html = '<div class="sec"><div class="sec-t">فیلدها</div>';
+  html += entries.map(([k, v]) => {
+    if (v === null || v === undefined || v === '') return '';
+    let display = typeof v === 'object' ? JSON.stringify(v) : String(v);
+    // Format numbers that look like amounts
+    const isAmt = (k==='amount'||k==='salary'||k==='budget'||k==='balance'||k==='purchasePrice') && typeof v === 'number';
+    const cls   = isAmt ? 'rv num' : 'rv';
+    return `<div class="row"><span class="rl">${esc(k)}</span><span class="${cls}">${esc(isAmt?fmt(v):display)}</span></div>`;
+  }).join('');
+  html += '</div>';
+  html += `<div class="sec"><div class="sec-t">JSON خام</div><div class="json-box">${esc(JSON.stringify(r, null, 2))}</div></div>`;
+  return html;
+}
+
+// ─── Copy JSON ────────────────────────────────────────────
+function copyJSON() {
+  const data = pickedRec || filtered;
+  navigator.clipboard.writeText(JSON.stringify(data, null, 2))
+    .then(()  => toast('✅ JSON کپی شد', 'ok'))
+    .catch(()  => toast('❌ خطا در کپی', 'err'));
+}
+
+// ─── Helpers ──────────────────────────────────────────────
+function fmt(n) {
+  if (!n && n !== 0) return '—';
+  return Number(n).toLocaleString('fa-IR');
+}
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+let _tt;
+function toast(msg, type='') {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.className = 'toast on ' + type;
+  clearTimeout(_tt);
+  _tt = setTimeout(() => el.classList.remove('on'), 2400);
+}
+</script>
+</body>
+</html>
